@@ -148,8 +148,8 @@ static void on_configure_request(XConfigureRequestEvent e, LimeWM *wm)
 static void frame(Window w, LimeWM *wm, int created_before)
 {
 	const uint32_t BORDER_WIDTH = 3;
-	const uint32_t BORDER_COLOR = 0xff0000;
-	const uint32_t BG_COLOR = 0x0000ff;
+	const uint32_t BORDER_COLOR = 0x118888;
+	const uint32_t BG_COLOR = 0xeeeeee;
 
 	XWindowAttributes x_window_attrs;
 	XGetWindowAttributes(wm->main_display, w, &x_window_attrs);
@@ -325,8 +325,9 @@ void on_motion_notify(XMotionEvent e, LimeWM *wm)
 		return;
 	}
 
+	//printf("%d,%d %d,%d\n",e.x_root, e.y_root, wm->sdragx, wm->sdragy);
 	int deltax = e.x_root - wm->sdragx;
-	int deltay = e.y_root - wm->sdragx;
+	int deltay = e.y_root - wm->sdragy;
 	if (e.state & Button1Mask)
 	{
 		int dstx = wm->framex + deltax;

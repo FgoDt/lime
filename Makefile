@@ -1,7 +1,8 @@
 TARGET := lime
 
 CC := gcc
-CPPFLAGS := -g `pkg-config --cflags --libs gtk3`
+CPPFLAGS := -g 
+#`pkg-config --cflags --libs gtk3`
 LDFLAGS :=  -lm -lpthread -lX11
 
 BUILD_DIR := ./build
