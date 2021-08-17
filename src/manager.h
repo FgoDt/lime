@@ -8,6 +8,10 @@ typedef struct lime_client
 {
 	Window window;
 	Window frame;
+	int frame_posx;
+	int frame_posy;
+	int frame_width;
+	int frame_height;
 } LimeClient;
 
 typedef struct lime_window_manager

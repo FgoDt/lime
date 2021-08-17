@@ -25,10 +25,13 @@ add_executable(
     "src/manager.c"
     "src/main.c"
     "src/gtk.c"
+    "src/Registrar.c"
+    "src/test.c"
 )
 add_definitions (${GTK3_CFLAGS_OTHER})
 target_link_libraries (
     lime 
     ${GTK3_LIBRARIES}
     X11
+    pthread
     )

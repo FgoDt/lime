@@ -119,8 +119,17 @@ static LimeClient *get_client(Window w, LimeWM *wm)
 	return c;
 }
 
-static void on_create_notify(XCreateWindowEvent e)
+static void on_create_notify(XCreateWindowEvent e, LimeWM *wm)
 {
+	XTextProperty p = {};
+	XGetWMName(wm->main_display, e.window, &p);
+	char **data = NULL;
+	int count = 0;
+	XTextPropertyToStringList(&p, &data, &count);
+	for(int i=0; i<count; i++){
+		printf("%s\n",data[i]);
+	}
+
 }
 
 static void on_destroy_notify(XDestroyWindowEvent e)
@@ -268,7 +277,7 @@ static void on_unmap_notify(XUnmapEvent e, LimeWM *wm)
 
 	if (e.event == wm->main_window)
 	{
-		lime_info("ignore unmap notify for reparented pre-existing window %d", e.window);
+		//lime_info("ignore unmap notify for reparented pre-existing window %d", e.window);
 		return;
 	}
 
@@ -423,6 +432,11 @@ void on_key_press(XKeyEvent e, LimeWM *wm)
 	}
 }
 
+
+void on_map_notify(XMapEvent e, LimeWM *wm)
+{
+}
+
 void lime_window_manager_run(LimeWM *wm)
 {
 
@@ -460,15 +474,25 @@ void lime_window_manager_run(LimeWM *wm)
 	{
 		XEvent e;
 		XNextEvent(wm->main_display, &e);
+		lime_info("event: %s", ToString(e));
 
 		switch (e.type)
 		{
 		case CreateNotify:
-			on_create_notify(e.xcreatewindow);
+			on_create_notify(e.xcreatewindow, wm);
 			break;
 
 		case ConfigureRequest:
 			on_configure_request(e.xconfigurerequest, wm);
+			break;
+
+		case ConfigureNotify:
+			printf("configure notify\n");
+			break;
+
+		case MapNotify:
+			printf("Map notify\n");
+			on_map_notify(e.xmap, wm);
 			break;
 
 		case DestroyNotify:
@@ -504,7 +528,7 @@ void lime_window_manager_run(LimeWM *wm)
 			break;
 
 		default:
-			//lime_info("ignored event: %s", ToString(e));
+			lime_info("ignored event: %s", ToString(e));
 			//lime_info("ignored event", NULL);
 			break;
 		}
