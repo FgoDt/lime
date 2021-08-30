@@ -1,7 +1,7 @@
 #include "log.h"
 #include "manager.h"
 
-int qqmain()
+int main(int argc, char *argv[])
 {
 	LimeWM *wm = lime_window_manager_create();
 	int ret = lime_window_manager_init(wm);

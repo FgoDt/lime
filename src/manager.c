@@ -2,6 +2,7 @@
 #include "log.h"
 #include "mem.h"
 #include <X11/Xutil.h>
+#include <X11/cursorfont.h>
 #include <stdio.h>
 #include <unistd.h>
 
@@ -112,6 +113,58 @@ static LimeClient *get_client(Window w, LimeWM *wm)
 		c = entry->data;
 		if (c->window == w)
 		{
+			c->event_src = LIME_WINDOW;
+			break;
+		}
+		if(c->frame == w)
+		{
+			c->event_src = LIME_FRAME;
+			break;
+		}
+		if(c->title == w)
+		{
+			c->event_src = LIME_TITLE_BAR;
+			break;
+		}
+		if(c->leftSide == w)
+		{
+			c->event_src = LIME_LSIDE;
+			break;
+		}
+		if(c->rightSide == w)
+		{
+			c->event_src = LIME_RSIDE;
+			break;
+		}
+		if(c->downSide == w){
+			c->event_src = LIME_BSIDE;
+			break;
+		}
+		if(c->downLeftCorner == w)
+		{
+			c->event_src = LIME_LCORNER;
+			break;
+		}
+		if(c->downRightCorner == w)
+		{
+			c->event_src = LIME_RCORNER;
+			break;
+		}
+		c = NULL;
+	}
+	return c;
+}
+
+static LimeClient *get_client_use_frame(Window frame, LimeWM *wm)
+{
+
+	LimeClient *c = NULL;
+	for (LimeListEntry *entry = wm->clients->root; entry != NULL; entry = entry->next)
+	{
+		c = entry->data;
+		if (c->frame == frame)
+		{
+			c->event_src = LIME_FRAME;
 			break;
 		}
 		c = NULL;
@@ -154,14 +207,131 @@ static void on_configure_request(XConfigureRequestEvent e, LimeWM *wm)
 	lime_info("resize window:%d to %dx%d", e.window, e.width, e.height);
 }
 
+static Window createTitlebar(LimeWM *wm,Window frame, int width ){
+
+	const uint32_t BG_COLOR = 0xf22222;
+	Window title = XCreateSimpleWindow(wm->main_display, frame, 0,
+	0,width,10,0,0, BG_COLOR);
+	//XAddToSaveSet(wm->main_display, title);
+	XReparentWindow(wm->main_display, frame, title, 0,0);
+	XMapWindow(wm->main_display, title);
+	XSelectInput(wm->main_display, title, EnterWindowMask|LeaveWindowMask);
+
+	//XGrabPointer(
+	//	wm->main_display,
+	//	title,
+	//	0,
+	//        ButtonPressMask|EnterWindowMask|LeaveWindowMask,
+	//	GrabModeAsync,
+	//	GrabModeAsync,
+	//	None,
+	//	None,
+	//	CurrentTime
+	//);
+
+
+	XGrabButton(
+	wm->main_display,
+	Button1,
+	0,
+	title,
+	0,
+	ButtonPressMask | ButtonReleaseMask | ButtonMotionMask,
+	GrabModeAsync,
+	GrabModeAsync,
+	title,
+	None);
+
+	return title;
+}
+
+
+#define CORNER_WIDTH 10
+
+static void grabButton1(LimeWM *wm, Window w){
+
+	XGrabButton(
+		wm->main_display,
+		Button1,
+		0,
+		w,
+		0,
+		ButtonPressMask | ButtonReleaseMask | ButtonMotionMask,
+		GrabModeAsync,
+		GrabModeAsync,
+		None,
+		None);
+}
+
+static Window createDownSide(LimeWM *wm, Window frame, int pwidth, int pheight){
+	const uint32_t BG_COLOR = 0x725222;
+	Window side= XCreateSimpleWindow(wm->main_display, frame, CORNER_WIDTH,
+	pheight-2,pwidth-CORNER_WIDTH*2,2,0,0, BG_COLOR);
+	XReparentWindow(wm->main_display, frame, side, 0,0);
+	XMapWindow(wm->main_display, side);
+
+	grabButton1(wm, side);
+	return side;
+}
+
+static Window createLRSide(LimeWM *wm, Window frame, int left, int pwidth, int pheight){
+	const uint32_t BG_COLOR = 0x725222;
+
+	int x = 0;
+	if(!left){
+		x = pwidth-2;
+	}
+
+	Window side = XCreateSimpleWindow(wm->main_display, frame,
+	 x, 10, //window pos
+	 2, pheight-10-2, //window size
+	 0,0,BG_COLOR);
+
+	XReparentWindow(wm->main_display, frame, side, 0, 0);
+	XMapWindow(wm->main_display, side);
+	grabButton1(wm, side);
+	 return side;
+}
+
+static Window createCorner(LimeWM *wm, Window frame, int left, int pwidth, int pheight){
+	const uint32_t BG_COLOR = 0x225222;
+	int x = 0;
+	if(!left){
+		x = pwidth - CORNER_WIDTH;
+	}
+
+	Window side = XCreateSimpleWindow(wm->main_display, frame,
+	x,pheight-2,
+	CORNER_WIDTH,2,
+	0,0,BG_COLOR);
+	XReparentWindow(wm->main_display, frame, side, 0,0);
+	XMapWindow(wm->main_display,side);
+	grabButton1(wm, side);
+	return side;
+
+}
+
+
+
 static void frame(Window w, LimeWM *wm, int created_before)
 {
-	const uint32_t BORDER_WIDTH = 3;
+	const uint32_t BORDER_WIDTH = 0;
 	const uint32_t BORDER_COLOR = 0x118888;
-	const uint32_t BG_COLOR = 0xeeeeee;
+	const uint32_t BG_COLOR = 0x222222;
 
 	XWindowAttributes x_window_attrs;
 	XGetWindowAttributes(wm->main_display, w, &x_window_attrs);
+	Atom *protocols;
+	Atom *ap;
+	int n, i;
+	int status = XGetWMProtocols(wm->main_display, w, &protocols, &n);
+	
+	if(status && (protocols != NULL))
+	{
+		for(i = 0, ap = protocols; i < n; i++, ap++){
+			printf("ap: %d\n",*ap);
+		}
+	}
 
 	if (created_before)
 	{
@@ -181,51 +351,44 @@ static void frame(Window w, LimeWM *wm, int created_before)
 											 BORDER_COLOR,
 											 BG_COLOR);
 	XSelectInput(wm->main_display, frame,
-				 SubstructureNotifyMask | SubstructureRedirectMask);
+				 SubstructureNotifyMask | SubstructureRedirectMask  );
 	XAddToSaveSet(wm->main_display, w);
+	XResizeWindow(wm->main_display,w,x_window_attrs.width, x_window_attrs.height-10);
 	XReparentWindow(wm->main_display, w,
-					frame, 0, 0);
+					frame, 0, 10);
 	XMapWindow(wm->main_display, frame);
+
+	Window title =  createTitlebar(wm, frame, x_window_attrs.width);
+
 	LimeClient *c = lime_mallocz(sizeof(*c));
+	
+	c->downSide = createDownSide(wm, frame, x_window_attrs.width, x_window_attrs.height);
+
+	c->leftSide = createLRSide(wm,frame, 1, x_window_attrs.width, x_window_attrs.height);
+
+	c->rightSide = createLRSide(wm,frame, 0, x_window_attrs.width, x_window_attrs.height);
+
+	c->downLeftCorner = createCorner(wm, frame, 1, x_window_attrs.width, x_window_attrs.height);
+
+	c->downRightCorner = createCorner(wm, frame, 0, x_window_attrs.width, x_window_attrs.height);
+
 	c->frame = frame;
 	c->window = w;
+	c->title = title;
+	printf("#############\nadd title:%d\n##############\n",title);
 	lime_list_add(wm->clients, c);
-	XGrabButton(
-		wm->main_display,
-		Button1,
-		Mod1Mask,
-		w,
-		0,
-		ButtonPressMask | ButtonReleaseMask | ButtonMotionMask,
-		GrabModeAsync,
-		GrabModeAsync,
-		None,
-		None);
 
-	XGrabButton(
-		wm->main_display,
-		Button3,
-		Mod1Mask,
-		w,
-		0,
-		ButtonPressMask | ButtonReleaseMask | ButtonMotionMask,
-		GrabModeAsync,
-		GrabModeAsync,
-		None,
-		None);
-
-//	XGrabButton(
-//		wm->main_display,
-//		Button1,
-//		0,
-//		frame,
-//		0,
-//		ButtonPressMask | ButtonReleaseMask ,
-//		GrabModeAsync,
-//		GrabModeAsync,
-//		None,
-//		None
-//	);
+	//XGrabPointer(
+	//	wm->main_display,
+	//	frame,
+	//	0,
+	//        EnterWindowMask|LeaveWindowMask,
+	//	GrabModeAsync,
+	//	GrabModeAsync,
+	//	None,
+	//	None,
+	//	CurrentTime
+	//);
 
 	XGrabKey(
 		wm->main_display,
@@ -244,6 +407,7 @@ static void frame(Window w, LimeWM *wm, int created_before)
 		0,
 		GrabModeAsync,
 		GrabModeAsync);
+	
 
 	lime_info("framed widnow %d [%d]", w, frame);
 }
@@ -291,14 +455,23 @@ static void on_unmap_notify(XUnmapEvent e, LimeWM *wm)
 	unfame(e.window, wm, c);
 }
 
-static void on_button_press(XButtonEvent e, LimeWM *wm)
+static void on_button_press(XButtonEvent e, LimeWM *wm, XEvent *xe)
 {
-	LimeClient *c = get_client(e.window, wm);
+	LimeClient *c = NULL;
+	if(!(e.state&Mod1Mask)){
+		c = get_client(e.window, wm);
+		//c = get_client_use_frame(e.window, wm);
+	}else{
+		c = get_client(e.window, wm);
+	}
 	if (c == NULL)
 	{
 		lime_info("can not find window %d", e.window);
 		return;
 	}
+	if(c->event_src == LIME_TITLE_BAR){
+			//create arrow cursor
+		}
 
 	wm->sdragx = e.x_root;
 	wm->sdragy = e.y_root;
@@ -321,8 +494,15 @@ static void on_button_press(XButtonEvent e, LimeWM *wm)
 		   wm->sdragx, wm->sdragy);
 
 	XRaiseWindow(wm->main_display, c->frame);
-	XSetInputFocus(wm->main_display, c->window,
-	 RevertToPointerRoot, CurrentTime);
+	XSetInputFocus(wm->main_display, c->window,RevertToPointerRoot, CurrentTime);
+	if(!(e.state & Mod1Mask)){
+		XUngrabButton(
+			wm->main_display,
+			Button1,
+			AnyModifier,
+			c->frame
+		);
+	}
 }
 
 void on_motion_notify(XMotionEvent e, LimeWM *wm)
@@ -337,7 +517,7 @@ void on_motion_notify(XMotionEvent e, LimeWM *wm)
 	//printf("%d,%d %d,%d\n",e.x_root, e.y_root, wm->sdragx, wm->sdragy);
 	int deltax = e.x_root - wm->sdragx;
 	int deltay = e.y_root - wm->sdragy;
-	if (e.state & Button1Mask)
+	if (e.state & Button1Mask && c->event_src == LIME_TITLE_BAR)
 	{
 		int dstx = wm->framex + deltax;
 		int dsty = wm->framey + deltay;
@@ -346,8 +526,15 @@ void on_motion_notify(XMotionEvent e, LimeWM *wm)
 					dstx,
 					dsty);
 	}
-	else if (e.state & Button3Mask)
+	else if (e.state & Button1Mask)
 	{
+		if(c->event_src == LIME_TITLE_BAR){
+			//create arrow cursor
+			Cursor cr = XCreateFontCursor(wm->main_display, XC_arrow);
+			XDefineCursor(wm->main_display,wm->main_window,cr);
+			printf("try change cursor\n");
+		}
+
 		deltax = deltax > -wm->framew ? deltax : wm->framew;
 		deltay = deltay > -wm->frameh ? deltay : wm->frameh;
 		int dstw = wm->framew + deltax;
@@ -363,7 +550,67 @@ void on_motion_notify(XMotionEvent e, LimeWM *wm)
 			wm->main_display,
 			c->window,
 			dstw,
-			dsth);
+			dsth-10);
+
+		//resize title
+		XResizeWindow(
+			wm->main_display,
+			c->title,
+			dstw,
+			10
+		);
+		//resieze side
+		XResizeWindow(
+			wm->main_display,
+			c->leftSide,
+			2,
+			dsth-10-2
+		);
+
+		XResizeWindow(
+			wm->main_display,
+			c->rightSide,
+			2,
+			dsth-10-2
+		);
+
+		XMoveWindow(
+			wm->main_display,
+			c->rightSide,
+			dstw-2,
+			10
+		);
+
+		//resize button side
+		XResizeWindow(
+			wm->main_display,
+			c->downSide,
+			dstw-CORNER_WIDTH*2,
+			2
+		);
+		XMoveWindow(
+			wm->main_display,
+			c->downSide,
+			CORNER_WIDTH,
+			dsth-2
+		);
+		//reisize corner
+		XMoveWindow(
+			wm->main_display,
+			c->downLeftCorner,
+			0,
+			dsth-2
+		);
+		XMoveWindow(
+			wm->main_display,
+			c->downRightCorner,
+			dstw-CORNER_WIDTH,
+			dsth-2
+		);
+
+	}else if (e.state & Button1)
+	{
+		printf("motion:%dx%d\n", e.x_root, e.y_root);
 	}
 }
 
@@ -436,6 +683,60 @@ void on_key_press(XKeyEvent e, LimeWM *wm)
 void on_map_notify(XMapEvent e, LimeWM *wm)
 {
 }
+
+void on_focus_in(XFocusInEvent e, LimeWM *wm)
+{
+//	XUngrabButton(
+//		wm->main_display,
+//		Button1,
+//		ButtonPressMask ,
+//		e.window
+//	);
+
+
+}
+void on_focus_out(XFocusOutEvent e, LimeWM *wm)
+{
+//	XGrabButton(
+//		wm->main_display,
+//		Button1,
+//		0,
+//		e.window,
+//		0,
+//		ButtonPressMask,
+//		GrabModeAsync,
+//		GrabModeAsync,
+//		None,
+//		None
+//	);
+}
+void on_pointer_enter(XCrossingEvent e,LimeWM* wm)
+{
+	LimeClient *c = get_client(e.window, wm);
+	if(c->event_src == LIME_TITLE_BAR){
+		printf("$$$$$$$$$$$$$$$$$$$$$\n");
+
+		Cursor cr = XCreateFontCursor(wm->main_display, XC_bottom_left_corner);
+		XDefineCursor(wm->main_display,c->title,cr);
+	}else if (c->event_src == LIME_FRAME){
+		printf("###################\n");
+                
+		//XUngrabPointer(wm->main_display,CurrentTime);
+	}else if(c->event_src == LIME_WINDOW){
+		printf("####^^^^^^^^^^^###############\n");
+    }
+}
+
+void on_pointer_leave(XCrossingEvent e,LimeWM* wm)
+{
+	LimeClient *c = get_client(e.window, wm);
+	if(c->event_src == LIME_TITLE_BAR){
+		printf("@@@@@@@@@@@@@@@@@@@@@\n");
+	}else{
+		printf("**********************\n");
+	}
+}
+
 
 void lime_window_manager_run(LimeWM *wm)
 {
@@ -512,19 +813,36 @@ void lime_window_manager_run(LimeWM *wm)
 			break;
 
 		case ButtonPress:
-			on_button_press(e.xbutton, wm);
+			on_button_press(e.xbutton, wm, &e);
 			break;
+
 		case MotionNotify:
-			while (XCheckTypedWindowEvent(
-				wm->main_display,
-				e.xmotion.window,
-				MotionNotify, &e))
-			{
-			}
+			//while (XCheckTypedWindowEvent(
+			//	wm->main_display,
+			//	e.xmotion.window,
+			//	MotionNotify, &e))
+			//{
+			//}
 			on_motion_notify(e.xmotion, wm);
 
 		case KeyPress:
 			on_key_press(e.xkey, wm);
+			break;
+
+		case FocusIn:
+			on_focus_in(e.xfocus, wm);
+			break;
+
+		case FocusOut:
+			on_focus_out(e.xfocus, wm);
+			break;
+
+		case EnterNotify:
+			on_pointer_enter(e.xcrossing, wm);
+			break;
+
+		case LeaveNotify:
+			on_pointer_leave(e.xcrossing, wm);
 			break;
 
 		default:

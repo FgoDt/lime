@@ -4,10 +4,28 @@
 #include "list.h"
 #include <X11/Xlib.h>
 
+typedef enum lime_event_src{
+	LIME_TITLE_BAR,
+	LIME_LSIDE,
+	LIME_RSIDE,
+	LIME_BSIDE,
+	LIME_LCORNER,
+	LIME_RCORNER,
+	LIME_FRAME,
+	LIME_WINDOW,
+}LimeEventSrc;
+
 typedef struct lime_client
 {
 	Window window;
 	Window frame;
+	Window title;
+	Window downSide;
+	Window leftSide;
+	Window rightSide;
+	Window downLeftCorner;
+	Window downRightCorner;
+	LimeEventSrc event_src;
 	int frame_posx;
 	int frame_posy;
 	int frame_width;
