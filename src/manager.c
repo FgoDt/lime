@@ -5,7 +5,10 @@
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/cursorfont.h>
+#include <errno.h>
 #include <stdio.h>
+#include <string.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 static int wm_detected = 0;
@@ -39,6 +42,9 @@ int lime_window_manager_init(LimeWM *wm) {
   XSetErrorHandler(onWMDetected);
   XSelectInput(wm->main_display, wm->main_window,
                SubstructureRedirectMask | SubstructureNotifyMask);
+  XGrabKey(wm->main_display, XKeysymToKeycode(wm->main_display, XK_T),
+           Mod1Mask | ControlMask, wm->main_window, false, GrabModeAsync,
+           GrabModeAsync);
   XSync(wm->main_display, 0);
   if (wm_detected) {
     lime_error("detected another window manager on display %s",
@@ -310,11 +316,11 @@ static void frame(Window w, LimeWM *wm, int created_before) {
   c->rightSide =
       createLRSide(wm, frame, 0, x_window_attrs.width, x_window_attrs.height);
 
-  c->downLeftCorner =
-      createCorner(wm, frame, 1, x_window_attrs.width, x_window_attrs.height);
+  //c->downLeftCorner =
+  //    createCorner(wm, frame, 1, x_window_attrs.width, x_window_attrs.height);
 
-  c->downRightCorner =
-      createCorner(wm, frame, 0, x_window_attrs.width, x_window_attrs.height);
+  //c->downRightCorner =
+  //    createCorner(wm, frame, 0, x_window_attrs.width, x_window_attrs.height);
 
   c->frame = frame;
   c->window = w;
@@ -510,7 +516,6 @@ void on_motion_notify(XMotionEvent e, LimeWM *wm) {
     int dstw = c->frame_width + deltax;
     int dsth = c->frame_height;
 
-
     int dstx = c->rside_posx + deltax;
     int dsty = c->rside_posy;
 
@@ -519,12 +524,13 @@ void on_motion_notify(XMotionEvent e, LimeWM *wm) {
     XResizeWindow(wm->main_display, c->frame, dstw, dsth);
     XResizeWindow(wm->main_display, c->window, dstw, dsth - 10);
     XResizeWindow(wm->main_display, c->title, dstw, 10);
-  }else if(c->on_bottom_resize == 1){
+    XResizeWindow(wm->main_display, c->downSide, dstw , dsth);
+  } else if (c->on_bottom_resize == 1) {
     int deltax = e.x_root - c->drag_src_posx;
     int deltay = e.y_root - c->drag_src_posy;
     deltax = deltax > -c->frame_width ? deltax : c->frame_width;
     deltay = deltay > -c->frame_height ? deltay : c->frame_height;
-    int dstw = c->frame_width ;
+    int dstw = c->frame_width;
     int dsth = c->frame_height + deltay;
 
     int dstx = c->bside_posx;
@@ -540,6 +546,22 @@ void on_motion_notify(XMotionEvent e, LimeWM *wm) {
 }
 
 void on_key_press(XKeyEvent e, LimeWM *wm) {
+  if ((e.state & Mod1Mask && e.state & ControlMask &&
+       e.keycode == XKeysymToKeycode(wm->main_display, XK_T))) {
+    printf("exec xterm\n");
+
+    pid_t pid = fork();
+    switch (pid) {
+    case -1:
+      break;
+    case 0: {
+      int ret = execl("/usr/bin/xterm", "");
+      if (ret != 0) {
+        printf("exec error:%s\n", strerror(errno));
+      }
+    } break;
+    }
+  }
   if ((e.state & Mod1Mask) &&
       (e.keycode == XKeysymToKeycode(wm->main_display, XK_F4))) {
     Atom *supported_protocols;
@@ -722,6 +744,7 @@ void lime_window_manager_run(LimeWM *wm) {
       on_motion_notify(e.xmotion, wm);
 
     case KeyPress:
+      printf("key press\n");
       on_key_press(e.xkey, wm);
       break;
 
